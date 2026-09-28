@@ -1,4 +1,4 @@
-﻿export type UserRole = 'Customer' | 'Merchant' | 'Admin';
+export type UserRole = 'Customer' | 'Merchant' | 'Admin';
 
 export interface User {
   userID: number;
@@ -110,12 +110,48 @@ export interface TopProduct {
   revenue: number;
 }
 
+export interface LowStockAlert {
+  productID: number;
+  name: string;
+  categoryName: string;
+  currentStock: number;
+  recommendedRestock: number;
+  price: number;
+}
+
 export interface MerchantAnalytics {
   totalRevenue: number;
   totalOrders: number;
   activeProducts: number;
   lowStockCount: number;
   topProducts: TopProduct[];
+  lowStockAlerts?: LowStockAlert[];
+}
+
+export interface CustomerAcquisition {
+  totalUsers: number;
+  newUsersThisMonth: number;
+  totalCustomers: number;
+  totalMerchants: number;
+  customerGrowthRate: number;
+}
+
+export interface OrderFulfillment {
+  pendingOrders: number;
+  paidOrders: number;
+  shippedOrders: number;
+  deliveredOrders: number;
+  cancelledOrders: number;
+  fulfillmentRate: number;
+}
+
+export interface HighRiskOrder {
+  orderID: number;
+  customerName: string;
+  totalAmount: number;
+  orderDate: string;
+  riskReason: string;
+  isVerified: boolean;
 }
 
 export interface AdminAnalytics {
@@ -125,6 +161,9 @@ export interface AdminAnalytics {
   totalMerchants: number;
   totalProducts: number;
   topSellingProducts: TopProduct[];
+  customerAcquisition?: CustomerAcquisition;
+  orderFulfillment?: OrderFulfillment;
+  highRiskOrders?: HighRiskOrder[];
 }
 
 export interface AdminUser {
@@ -136,3 +175,4 @@ export interface AdminUser {
   createdAt: string;
   orderCount: number;
 }
+

@@ -1,8 +1,9 @@
-﻿import React from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
-import { Star, ShoppingCart, Check } from 'lucide-react';
+import { Star, ShoppingCart, Check, Heart } from 'lucide-react';
 import { Product } from '../types';
 import { useCart } from '../context/CartContext';
+import { useWishlist } from '../context/WishlistContext';
 
 interface ProductCardProps {
   product: Product;
@@ -10,7 +11,19 @@ interface ProductCardProps {
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const { addToCart, items } = useCart();
+  const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
   const inCart = items.some((i) => i.product.productID === product.productID);
+  const isWishlisted = isInWishlist(product.productID);
+
+  const toggleWishlist = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isWishlisted) {
+      removeFromWishlist(product.productID);
+    } else {
+      addToWishlist(product);
+    }
+  };
 
   const formattedPrice = new Intl.NumberFormat('en-IN', {
     style: 'currency',
@@ -33,6 +46,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             {product.categoryName}
           </span>
         </div>
+
+        {/* Wishlist Button */}
+        <button
+          onClick={toggleWishlist}
+          title={isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}
+          className="absolute top-3 right-3 p-1.5 rounded-full bg-white/90 backdrop-blur-md text-slate-400 hover:text-rose-500 shadow-sm transition hover:scale-110"
+        >
+          <Heart
+            className={`w-4 h-4 ${
+              isWishlisted ? 'fill-rose-500 text-rose-500' : 'text-slate-400'
+            }`}
+          />
+        </button>
         {product.stock <= 5 && product.stock > 0 && (
           <div className="absolute top-3 right-3">
             <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-500 text-white rounded-md shadow-xs">

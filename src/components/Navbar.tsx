@@ -1,12 +1,14 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingBag, ShoppingCart, User, LogOut, LayoutDashboard, Shield, PackageCheck, Search } from 'lucide-react';
+import { ShoppingBag, ShoppingCart, User, LogOut, LayoutDashboard, Shield, PackageCheck, Search, Heart, UserCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { useWishlist } from '../context/WishlistContext';
 
 export const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
   const { totalItems } = useCart();
+  const { wishlist } = useWishlist();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
 
@@ -43,7 +45,7 @@ export const Navbar: React.FC = () => {
         </form>
 
         {/* Navigation Links & User Menu */}
-        <div className="flex items-center gap-3 sm:gap-4">
+        <div className="flex items-center gap-2 sm:gap-3">
           <Link
             to="/"
             className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors hidden sm:block"
@@ -71,16 +73,19 @@ export const Navbar: React.FC = () => {
             </Link>
           )}
 
-          {user && (
-            <Link
-              to="/orders"
-              className="flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors"
-              title="My Orders"
-            >
-              <PackageCheck className="w-4 h-4" />
-              <span className="hidden md:inline">Orders</span>
-            </Link>
-          )}
+          {/* Wishlist Link */}
+          <Link
+            to="/wishlist"
+            className="relative p-2 text-slate-700 hover:text-rose-600 transition-colors rounded-full hover:bg-slate-100"
+            title="My Wishlist"
+          >
+            <Heart className="w-5 h-5" />
+            {wishlist.length > 0 && (
+              <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold leading-none text-white transform translate-x-1/4 -translate-y-1/4 bg-rose-500 rounded-full">
+                {wishlist.length}
+              </span>
+            )}
+          </Link>
 
           {/* Cart Icon */}
           <Link
@@ -90,22 +95,29 @@ export const Navbar: React.FC = () => {
           >
             <ShoppingCart className="w-5 h-5" />
             {totalItems > 0 && (
-              <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white transform translate-x-1/4 -translate-y-1/4 bg-indigo-600 rounded-full">
+              <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold leading-none text-white transform translate-x-1/4 -translate-y-1/4 bg-indigo-600 rounded-full">
                 {totalItems}
               </span>
             )}
           </Link>
 
-          {/* Auth Button */}
+          {/* User Menu */}
           {user ? (
             <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
-              <div className="hidden lg:block text-right">
-                <p className="text-xs font-semibold text-slate-800 leading-tight">{user.name}</p>
-                <p className="text-[10px] text-indigo-600 font-medium uppercase">{user.role}</p>
-              </div>
+              <Link
+                to="/profile"
+                className="flex items-center gap-2 py-1 px-2 rounded-lg hover:bg-slate-100 transition"
+                title="Account & Address Book"
+              >
+                <UserCircle className="w-5 h-5 text-indigo-600" />
+                <div className="hidden lg:block text-left">
+                  <p className="text-xs font-semibold text-slate-800 leading-tight line-clamp-1">{user.name}</p>
+                  <p className="text-[10px] text-indigo-600 font-medium uppercase">{user.role}</p>
+                </div>
+              </Link>
               <button
                 onClick={logout}
-                className="p-2 text-slate-500 hover:text-red-600 rounded-full hover:bg-red-50 transition-colors"
+                className="p-2 text-slate-400 hover:text-red-600 rounded-full hover:bg-red-50 transition-colors"
                 title="Sign Out"
               >
                 <LogOut className="w-4 h-4" />
@@ -125,3 +137,4 @@ export const Navbar: React.FC = () => {
     </header>
   );
 };
+

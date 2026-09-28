@@ -1,13 +1,13 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   DollarSign, Package, ShoppingBag, AlertTriangle, Plus, Edit2, Trash2, 
-  RefreshCw, History, ArrowUpRight, ArrowDownRight
+  RefreshCw, History, ArrowUpRight, ArrowDownRight, Download, Upload, FileSpreadsheet, CheckCircle2
 } from 'lucide-react';
 import api from '../../api/client';
 import { Product, MerchantAnalytics, InventoryLog, Category } from '../../types';
 
 export const MerchantDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'inventory'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'inventory' | 'lowstock'>('overview');
   const [analytics, setAnalytics] = useState<MerchantAnalytics | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -20,6 +20,12 @@ export const MerchantDashboard: React.FC = () => {
   const [restockProductId, setRestockProductId] = useState<number | null>(null);
   const [restockQty, setRestockQty] = useState(10);
   const [restockNotes, setRestockNotes] = useState('');
+
+  // Bulk Import State
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importCsvText, setImportCsvText] = useState('');
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState<string | null>(null);
 
   // Product Form
   const [formName, setFormName] = useState('');
@@ -82,7 +88,7 @@ export const MerchantDashboard: React.FC = () => {
         price: Number(formPrice),
         stock: Number(formStock),
         categoryID: Number(formCatId),
-        imageUrl: formImg,
+        imageUrl: formImg || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800',
         status: 'Active',
       };
 
@@ -116,7 +122,7 @@ export const MerchantDashboard: React.FC = () => {
       await api.post('/inventory/restock', {
         productID: restockProductId,
         quantity: Number(restockQty),
-        notes: restockNotes,
+        notes: restockNotes || 'Restock batch update',
       });
       setShowRestockModal(false);
       fetchData();
@@ -125,27 +131,159 @@ export const MerchantDashboard: React.FC = () => {
     }
   };
 
+  const handleQuickRestock = (productId: number, recommended: number) => {
+    setRestockProductId(productId);
+    setRestockQty(recommended);
+    setRestockNotes('Automated low-stock restock batch');
+    setShowRestockModal(true);
+  };
+
+  // 1-Click CSV Export (Section 4.2 of Synopsis)
+  const handleExportCsv = () => {
+    if (products.length === 0) {
+      alert('No products available to export.');
+      return;
+    }
+    const headers = ['ProductID', 'Name', 'Category', 'Price', 'Stock', 'Status', 'Rating'];
+    const rows = products.map((p) => [
+      p.productID,
+      `"${p.name.replace(/"/g, '""')}"`,
+      `"${p.categoryName}"`,
+      p.price,
+      p.stock,
+      p.status,
+      p.avgRating,
+    ]);
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `easyshop_products_export_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Bulk CSV Import (Section 4.2 of Synopsis)
+  const downloadSampleTemplate = () => {
+    const template = `Name,CategoryID,Price,Stock,Description,ImageUrl\n"Wireless Gaming Mouse",1,2499,30,"RGB ergonomic lightweight gaming mouse","https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=800"\n"Slim Portable Powerbank 20000mAh",1,1899,25,"Fast charging USB-C dual output powerbank","https://images.unsplash.com/photo-1609592424360-6421597d515a?w=800"`;
+    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'easyshop_bulk_product_template.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setImportCsvText(event.target?.result as string);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleProcessBulkImport = async () => {
+    if (!importCsvText.trim()) {
+      alert('Please select or paste CSV content.');
+      return;
+    }
+    setImportLoading(true);
+    setImportResult(null);
+    try {
+      const lines = importCsvText.trim().split('\n');
+      if (lines.length < 2) {
+        throw new Error('CSV must contain header row and at least one product.');
+      }
+      let successCount = 0;
+      // Skip header
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        // Simple CSV splitter handling quotes
+        const match = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+        if (match && match.length >= 4) {
+          const name = match[0].replace(/^"|"$/g, '');
+          const catId = Number(match[1].replace(/^"|"$/g, '')) || formCatId;
+          const price = Number(match[2].replace(/^"|"$/g, '')) || 999;
+          const stock = Number(match[3].replace(/^"|"$/g, '')) || 10;
+          const desc = match[4] ? match[4].replace(/^"|"$/g, '') : 'Imported catalog item';
+          const img = match[5]
+            ? match[5].replace(/^"|"$/g, '')
+            : 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800';
+
+          await api.post('/products', {
+            name,
+            categoryID: catId,
+            price,
+            stock,
+            description: desc,
+            imageUrl: img,
+            status: 'Active',
+          });
+          successCount++;
+        }
+      }
+      setImportResult(`Successfully imported ${successCount} products into your catalog!`);
+      fetchData();
+      setTimeout(() => {
+        setShowImportModal(false);
+        setImportResult(null);
+        setImportCsvText('');
+      }, 2000);
+    } catch (err: any) {
+      setImportResult(`Import error: ${err.message || 'Failed to process CSV file.'}`);
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-900">Merchant Storefront Management</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Control catalog, monitor stock levels, and inspect audit logs</p>
+          <p className="text-xs text-slate-500 mt-0.5">Control catalog, bulk import/export, monitor low stock, and inspect audit logs</p>
         </div>
 
-        <button
-          onClick={openAddModal}
-          className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-200 transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add New Product</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCsv}
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition"
+            title="Export Products to CSV"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Export CSV</span>
+          </button>
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="flex items-center gap-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-semibold transition"
+            title="Bulk Import Products from CSV"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>Bulk Import</span>
+          </button>
+          <button
+            onClick={openAddModal}
+            className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-200 transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Product</span>
+          </button>
+        </div>
       </div>
 
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+      {/* Tabs */}
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
         <button
           onClick={() => setActiveTab('overview')}
-          className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors ${
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors whitespace-nowrap ${
             activeTab === 'overview' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
@@ -153,15 +291,28 @@ export const MerchantDashboard: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('products')}
-          className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors ${
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors whitespace-nowrap ${
             activeTab === 'products' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
           Catalog Products ({products.length})
         </button>
         <button
+          onClick={() => setActiveTab('lowstock')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+            activeTab === 'lowstock' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <span>Low-Stock Alerts</span>
+          {(analytics?.lowStockAlerts?.length || 0) > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-amber-500 text-white font-bold">
+              {analytics?.lowStockAlerts?.length}
+            </span>
+          )}
+        </button>
+        <button
           onClick={() => setActiveTab('inventory')}
-          className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors ${
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors whitespace-nowrap ${
             activeTab === 'inventory' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
@@ -169,6 +320,7 @@ export const MerchantDashboard: React.FC = () => {
         </button>
       </div>
 
+      {/* TAB 1: Store Analytics */}
       {activeTab === 'overview' && analytics && (
         <div className="space-y-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -189,14 +341,36 @@ export const MerchantDashboard: React.FC = () => {
               <p className="text-2xl font-black text-slate-900">{analytics.lowStockCount}</p>
             </div>
           </div>
+
+          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-2xs">
+            <h2 className="text-base font-bold text-slate-900 mb-4">Top-Selling Products by Revenue</h2>
+            {analytics.topProducts.length === 0 ? (
+              <p className="text-xs text-slate-400">No sales recorded yet.</p>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {analytics.topProducts.map((tp) => (
+                  <div key={tp.productID} className="py-3 flex items-center justify-between text-xs">
+                    <div>
+                      <p className="font-bold text-slate-800 text-sm">{tp.name}</p>
+                      <p className="text-slate-400 font-mono mt-0.5">{tp.totalSold} units sold</p>
+                    </div>
+                    <span className="font-extrabold text-slate-900 text-sm">
+                      ₹{tp.revenue.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
+      {/* TAB 2: Catalog Products */}
       {activeTab === 'products' && (
-        <div className="p-6 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-4">
-          <div className="overflow-x-auto">
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-2xs overflow-hidden">
+          <div className="overflow-x-auto p-4 sm:p-6">
             <table className="w-full text-left text-xs">
-              <thead className="border-b border-slate-100 text-slate-400 font-bold uppercase text-[10px]">
+              <thead className="border-b border-slate-200 font-bold text-slate-400 uppercase tracking-wider">
                 <tr>
                   <th className="pb-3">Item</th>
                   <th className="pb-3">Category</th>
@@ -259,60 +433,120 @@ export const MerchantDashboard: React.FC = () => {
         </div>
       )}
 
-      {activeTab === 'inventory' && (
-        <div className="p-6 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-4">
-          <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-            <History className="w-4 h-4 text-indigo-600" /> Stock Audit Logs (3NF InventoryLogs)
-          </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="border-b border-slate-100 text-slate-400 font-bold uppercase text-[10px]">
-                <tr>
-                  <th className="pb-3">Timestamp</th>
-                  <th className="pb-3">Product</th>
-                  <th className="pb-3">Operation</th>
-                  <th className="pb-3 text-center">Delta</th>
-                  <th className="pb-3">Notes</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {logs.map((log) => (
-                  <tr key={log.logID} className="hover:bg-slate-50/80">
-                    <td className="py-3 text-slate-400 font-mono text-[11px]">{new Date(log.loggedAt).toLocaleString()}</td>
-                    <td className="py-3 font-semibold text-slate-800">{log.productName}</td>
-                    <td className="py-3">
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700">{log.operation}</span>
-                    </td>
-                    <td className="py-3 text-center font-bold font-mono">
-                      <span className={log.delta > 0 ? 'text-emerald-600' : 'text-red-600'}>
-                        {log.delta > 0 ? `+${log.delta}` : log.delta}
-                      </span>
-                    </td>
-                    <td className="py-3 text-slate-500 italic text-[11px]">{log.notes || 'System transaction'}</td>
+      {/* TAB 3: Low-Stock Alerts & Restock Recommendations (Section 10.5 of Synopsis) */}
+      {activeTab === 'lowstock' && (
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-2xs p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+                <span>Low-Stock Inventory Alerts & Recommendations</span>
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Automated threshold monitoring flagging items with stock &le; 10 units
+              </p>
+            </div>
+          </div>
+
+          {!analytics?.lowStockAlerts || analytics.lowStockAlerts.length === 0 ? (
+            <div className="text-center py-12 bg-emerald-50/50 rounded-2xl border border-emerald-100">
+              <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
+              <p className="text-sm font-bold text-emerald-800">All inventory levels are healthy</p>
+              <p className="text-xs text-emerald-600 mt-0.5">No products currently require immediate restocking.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="border-b border-slate-100 font-bold text-slate-400 uppercase tracking-wider">
+                  <tr>
+                    <th className="pb-3">Product Name</th>
+                    <th className="pb-3">Category</th>
+                    <th className="pb-3">Current Stock</th>
+                    <th className="pb-3">Recommended Restock</th>
+                    <th className="pb-3 text-right">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {analytics.lowStockAlerts.map((item) => (
+                    <tr key={item.productID} className="hover:bg-amber-50/30">
+                      <td className="py-3.5 font-bold text-slate-800">{item.name}</td>
+                      <td className="py-3.5 text-slate-600">{item.categoryName}</td>
+                      <td className="py-3.5">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
+                          {item.currentStock} units
+                        </span>
+                      </td>
+                      <td className="py-3.5 font-semibold text-indigo-600">
+                        +{item.recommendedRestock} units
+                      </td>
+                      <td className="py-3.5 text-right">
+                        <button
+                          onClick={() => handleQuickRestock(item.productID, item.recommendedRestock)}
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition"
+                        >
+                          Restock +{item.recommendedRestock}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 4: Inventory Audit Logs */}
+      {activeTab === 'inventory' && (
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-2xs p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <History className="w-4 h-4 text-indigo-600" />
+              <span>Inventory Audit Trail (Immutable Event Log)</span>
+            </h2>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {logs.map((log) => (
+              <div key={log.logID} className="py-3 flex items-center justify-between text-xs">
+                <div>
+                  <p className="font-bold text-slate-800">{log.productName}</p>
+                  <p className="text-slate-400 mt-0.5">{log.notes || 'Routine stock alteration'}</p>
+                  <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                    {new Date(log.loggedAt).toLocaleString()}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className={`px-2.5 py-1 rounded-full font-bold text-[11px] ${
+                    log.delta > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                  }`}>
+                    {log.delta > 0 ? `+${log.delta}` : log.delta} units ({log.operation})
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
+      {/* Add / Edit Product Modal */}
       {showProductModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
             <h3 className="text-base font-bold text-slate-900">
               {editingProduct ? 'Edit Catalog Product' : 'Add New Product'}
             </h3>
             <form onSubmit={handleSaveProduct} className="space-y-3 text-xs">
               <div>
-                <label className="block font-semibold text-slate-700">Name</label>
+                <label className="block font-semibold text-slate-700">Product Title</label>
                 <input type="text" required value={formName} onChange={(e) => setFormName(e.target.value)} className="mt-1 w-full px-3 py-2 border rounded-xl" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700">Category</label>
                   <select value={formCatId} onChange={(e) => setFormCatId(Number(e.target.value))} className="mt-1 w-full px-3 py-2 border rounded-xl bg-white">
-                    {categories.map((c) => (<option key={c.categoryID} value={c.categoryID}>{c.name}</option>))}
+                    {categories.map((c) => (
+                      <option key={c.categoryID} value={c.categoryID}>{c.name}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -343,6 +577,7 @@ export const MerchantDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* Restock Inventory Modal */}
       {showRestockModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 space-y-4">
@@ -353,14 +588,93 @@ export const MerchantDashboard: React.FC = () => {
                 <input type="number" min={1} required value={restockQty} onChange={(e) => setRestockQty(Number(e.target.value))} className="mt-1 w-full px-3 py-2 border rounded-xl" />
               </div>
               <div>
-                <label className="block font-semibold text-slate-700">Notes</label>
-                <input type="text" value={restockNotes} onChange={(e) => setRestockNotes(e.target.value)} placeholder="Restock batch batch#2026" className="mt-1 w-full px-3 py-2 border rounded-xl" />
+                <label className="block font-semibold text-slate-700">Notes / Batch Reference</label>
+                <input type="text" value={restockNotes} onChange={(e) => setRestockNotes(e.target.value)} placeholder="Restock batch #2026" className="mt-1 w-full px-3 py-2 border rounded-xl" />
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setShowRestockModal(false)} className="px-4 py-2 border rounded-xl font-semibold text-slate-600">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold">Restock</button>
+                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold">Confirm Restock</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Product Import Modal (Section 4.2 of Synopsis) */}
+      {showImportModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5 text-indigo-600" />
+                <h3 className="text-base font-bold text-slate-900">Bulk Product CSV Import</h3>
+              </div>
+              <button onClick={() => setShowImportModal(false)} className="text-slate-400 hover:text-slate-600 text-sm">✕</button>
+            </div>
+
+            <p className="text-xs text-slate-500">
+              Upload a standard CSV file or paste the CSV text below to rapidly populate your storefront catalog.
+            </p>
+
+            <div className="flex items-center justify-between bg-slate-50 p-3 rounded-2xl border border-slate-200">
+              <span className="text-xs font-semibold text-slate-700">Need the CSV structure?</span>
+              <button
+                type="button"
+                onClick={downloadSampleTemplate}
+                className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
+              >
+                Download Sample CSV
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Choose CSV File</label>
+              <input
+                type="file"
+                accept=".csv"
+                onChange={handleFileUpload}
+                className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Or Paste CSV Content</label>
+              <textarea
+                rows={5}
+                value={importCsvText}
+                onChange={(e) => setImportCsvText(e.target.value)}
+                placeholder={'Name,CategoryID,Price,Stock,Description,ImageUrl\n"Product Name",1,999,50,"Description","https://..."'}
+                className="w-full p-3 font-mono text-xs border rounded-xl focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+
+            {importResult && (
+              <div className={`p-3 rounded-xl text-xs font-medium ${
+                importResult.startsWith('Successfully')
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  : 'bg-red-50 text-red-700 border border-red-200'
+              }`}>
+                {importResult}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowImportModal(false)}
+                className="px-4 py-2 border rounded-xl font-semibold text-slate-600 text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={importLoading || !importCsvText.trim()}
+                onClick={handleProcessBulkImport}
+                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shadow-sm transition disabled:bg-slate-300"
+              >
+                {importLoading ? 'Importing Products...' : 'Start Import'}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -1,7 +1,8 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingBag, Lock, Mail, ArrowRight, ShieldCheck, Store, UserCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../api/client';
 
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
@@ -10,6 +11,42 @@ export const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Forgot password modal state
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetNewPass, setResetNewPass] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMsg, setResetMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetLoading(true);
+    setResetMsg(null);
+    try {
+      await api.post('/auth/reset-password', {
+        email: resetEmail,
+        newPassword: resetNewPass,
+      });
+      setResetMsg({
+        text: 'Password reset successful! You can now sign in with your new password.',
+        type: 'success',
+      });
+      setEmail(resetEmail);
+      setPassword(resetNewPass);
+      setTimeout(() => {
+        setShowForgotModal(false);
+        setResetMsg(null);
+      }, 2000);
+    } catch (err: any) {
+      setResetMsg({
+        text: err.response?.data?.message || 'Password reset failed. Check email.',
+        type: 'error',
+      });
+    } finally {
+      setResetLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,9 +119,18 @@ export const LoginPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                Password
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                  Password
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotModal(true)}
+                  className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-500"
+                >
+                  Forgot password?
+                </button>
+              </div>
               <div className="mt-1 relative rounded-xl shadow-2xs">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                 <input
@@ -107,6 +153,85 @@ export const LoginPage: React.FC = () => {
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
+
+          {/* Forgot Password Modal */}
+          {showForgotModal && (
+            <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl border border-slate-100">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+                  <h3 className="font-bold text-slate-800 text-sm">Reset Password</h3>
+                  <button
+                    onClick={() => {
+                      setShowForgotModal(false);
+                      setResetMsg(null);
+                    }}
+                    className="text-slate-400 hover:text-slate-600 text-sm"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {resetMsg && (
+                  <div
+                    className={`p-3 rounded-xl text-xs font-medium mb-3 ${
+                      resetMsg.type === 'success'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-red-50 text-red-700 border border-red-200'
+                    }`}
+                  >
+                    {resetMsg.text}
+                  </div>
+                )}
+
+                <form onSubmit={handleResetPassword} className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Account Email
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      placeholder="user@example.com"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      New Password
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      minLength={6}
+                      value={resetNewPass}
+                      onChange={(e) => setResetNewPass(e.target.value)}
+                      placeholder="At least 6 characters"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotModal(false)}
+                      className="w-1/2 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={resetLoading}
+                      className="w-1/2 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold disabled:bg-slate-300"
+                    >
+                      {resetLoading ? 'Resetting...' : 'Save Password'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
 
           {/* Quick Demo Logins */}
           <div className="mt-8 pt-6 border-t border-slate-200">

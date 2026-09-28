@@ -1,15 +1,17 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Star, ShieldCheck, ArrowLeft, Truck, RefreshCw, ShoppingCart, CheckCircle2, MessageSquarePlus } from 'lucide-react';
+import { Star, ShieldCheck, ArrowLeft, Truck, RefreshCw, ShoppingCart, CheckCircle2, MessageSquarePlus, Heart } from 'lucide-react';
 import api from '../../api/client';
 import { Product, Review } from '../../types';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
+import { useWishlist } from '../../context/WishlistContext';
 
 export const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { addToCart } = useCart();
   const { user } = useAuth();
+  const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -211,6 +213,31 @@ export const ProductDetailPage: React.FC = () => {
               >
                 <ShoppingCart className="w-4 h-4" />
                 <span>{added ? 'Added to Cart!' : 'Add to Shopping Cart'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  isInWishlist(product.productID)
+                    ? removeFromWishlist(product.productID)
+                    : addToWishlist(product)
+                }
+                className={`p-3 rounded-xl border transition shadow-sm ${
+                  isInWishlist(product.productID)
+                    ? 'border-rose-200 bg-rose-50 text-rose-600'
+                    : 'border-slate-200 text-slate-500 hover:text-rose-600 hover:bg-rose-50'
+                }`}
+                title={
+                  isInWishlist(product.productID)
+                    ? 'Remove from Wishlist'
+                    : 'Save to Wishlist'
+                }
+              >
+                <Heart
+                  className={`w-5 h-5 ${
+                    isInWishlist(product.productID) ? 'fill-rose-500' : ''
+                  }`}
+                />
               </button>
             </div>
           </div>

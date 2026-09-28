@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
+import { WishlistProvider } from './context/WishlistContext';
 import { SignalRProvider } from './context/SignalRContext';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
@@ -10,6 +11,8 @@ import { Footer } from './components/Footer';
 import { CatalogPage } from './pages/customer/CatalogPage';
 import { ProductDetailPage } from './pages/customer/ProductDetailPage';
 import { CartPage } from './pages/customer/CartPage';
+import { WishlistPage } from './pages/customer/WishlistPage';
+import { ProfilePage } from './pages/customer/ProfilePage';
 import { CheckoutPage } from './pages/customer/CheckoutPage';
 import { OrdersPage } from './pages/customer/OrdersPage';
 import { OrderTrackingPage } from './pages/customer/OrderTrackingPage';
@@ -35,72 +38,83 @@ export function App() {
     <BrowserRouter>
       <AuthProvider>
         <CartProvider>
-          <SignalRProvider>
-            <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
-              <Navbar />
-              <main className="flex-1">
-                <Routes>
-                  {/* Public Storefront */}
-                  <Route path="/" element={<CatalogPage />} />
-                  <Route path="/products/:id" element={<ProductDetailPage />} />
-                  <Route path="/cart" element={<CartPage />} />
+          <WishlistProvider>
+            <SignalRProvider>
+              <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
+                <Navbar />
+                <main className="flex-1">
+                  <Routes>
+                    {/* Public Storefront */}
+                    <Route path="/" element={<CatalogPage />} />
+                    <Route path="/products/:id" element={<ProductDetailPage />} />
+                    <Route path="/cart" element={<CartPage />} />
+                    <Route path="/wishlist" element={<WishlistPage />} />
 
-                  {/* Auth */}
-                  <Route path="/login" element={<LoginPage />} />
-                  <Route path="/register" element={<RegisterPage />} />
+                    {/* Auth */}
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route path="/register" element={<RegisterPage />} />
 
-                  {/* Customer Authenticated */}
-                  <Route
-                    path="/checkout"
-                    element={
-                      <ProtectedRoute allowedRoles={['Customer', 'Merchant', 'Admin']}>
-                        <CheckoutPage />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/orders"
-                    element={
-                      <ProtectedRoute allowedRoles={['Customer', 'Merchant', 'Admin']}>
-                        <OrdersPage />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/orders/:id/track"
-                    element={
-                      <ProtectedRoute allowedRoles={['Customer', 'Merchant', 'Admin']}>
-                        <OrderTrackingPage />
-                      </ProtectedRoute>
-                    }
-                  />
+                    {/* Customer Authenticated */}
+                    <Route
+                      path="/profile"
+                      element={
+                        <ProtectedRoute allowedRoles={['Customer', 'Merchant', 'Admin']}>
+                          <ProfilePage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/checkout"
+                      element={
+                        <ProtectedRoute allowedRoles={['Customer', 'Merchant', 'Admin']}>
+                          <CheckoutPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/orders"
+                      element={
+                        <ProtectedRoute allowedRoles={['Customer', 'Merchant', 'Admin']}>
+                          <OrdersPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/orders/:id/track"
+                      element={
+                        <ProtectedRoute allowedRoles={['Customer', 'Merchant', 'Admin']}>
+                          <OrderTrackingPage />
+                        </ProtectedRoute>
+                      }
+                    />
 
-                  {/* Merchant Authenticated */}
-                  <Route
-                    path="/merchant"
-                    element={
-                      <ProtectedRoute allowedRoles={['Merchant', 'Admin']}>
-                        <MerchantDashboard />
-                      </ProtectedRoute>
-                    }
-                  />
+                    {/* Merchant Authenticated */}
+                    <Route
+                      path="/merchant"
+                      element={
+                        <ProtectedRoute allowedRoles={['Merchant', 'Admin']}>
+                          <MerchantDashboard />
+                        </ProtectedRoute>
+                      }
+                    />
 
-                  {/* Admin Authenticated */}
-                  <Route
-                    path="/admin"
-                    element={
-                      <ProtectedRoute allowedRoles={['Admin']}>
-                        <AdminDashboard />
-                      </ProtectedRoute>
-                    }
-                  />
+                    {/* Admin Authenticated */}
+                    <Route
+                      path="/admin"
+                      element={
+                        <ProtectedRoute allowedRoles={['Admin']}>
+                          <AdminDashboard />
+                        </ProtectedRoute>
+                      }
+                    />
 
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-              </main>
-              <Footer />
-            </div>
-          </SignalRProvider>
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                </main>
+                <Footer />
+              </div>
+            </SignalRProvider>
+          </WishlistProvider>
         </CartProvider>
       </AuthProvider>
     </BrowserRouter>
