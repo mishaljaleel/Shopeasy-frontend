@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingBag, ShoppingCart, User, LogOut, LayoutDashboard, Shield, PackageCheck, Search, Heart, UserCircle } from 'lucide-react';
+import { ShoppingBag, ShoppingCart, User, LogOut, LayoutDashboard, Shield, PackageCheck, Search, Heart, UserCircle, Store } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
@@ -52,6 +52,16 @@ export const Navbar: React.FC = () => {
           >
             Explore
           </Link>
+
+          {!user && (
+            <Link
+              to="/register?role=Merchant"
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-700 hover:text-indigo-600 hover:bg-slate-100 transition-colors"
+            >
+              <Store className="w-3.5 h-3.5 text-indigo-500" />
+              <span>Become a Seller</span>
+            </Link>
+          )}
 
           {user?.role === 'Merchant' && (
             <Link

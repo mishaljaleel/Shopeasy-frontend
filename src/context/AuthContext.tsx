@@ -1,12 +1,12 @@
-﻿import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../api/client';
 import { User, UserRole } from '../types';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, pass: string) => Promise<void>;
-  register: (name: string, email: string, pass: string, role: UserRole) => Promise<void>;
+  login: (email: string, pass: string) => Promise<User>;
+  register: (name: string, email: string, pass: string, role: UserRole) => Promise<User>;
   logout: () => void;
 }
 
@@ -28,16 +28,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(false);
   }, []);
 
-  const login = async (email: string, pass: string) => {
+  const login = async (email: string, pass: string): Promise<User> => {
     const res = await api.post<User>('/auth/login', { email, password: pass });
     setUser(res.data);
     localStorage.setItem('easyshop_user', JSON.stringify(res.data));
+    return res.data;
   };
 
-  const register = async (name: string, email: string, pass: string, role: UserRole) => {
+  const register = async (name: string, email: string, pass: string, role: UserRole): Promise<User> => {
     const res = await api.post<User>('/auth/register', { name, email, password: pass, role });
     setUser(res.data);
     localStorage.setItem('easyshop_user', JSON.stringify(res.data));
+    return res.data;
   };
 
   const logout = () => {

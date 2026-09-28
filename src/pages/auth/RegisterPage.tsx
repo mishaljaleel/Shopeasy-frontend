@@ -1,5 +1,5 @@
-﻿import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ShoppingBag, Lock, Mail, User as UserIcon, Store, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../types';
@@ -7,20 +7,33 @@ import { UserRole } from '../../types';
 export const RegisterPage: React.FC = () => {
   const { register } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<UserRole>('Customer');
+  const [role, setRole] = useState<UserRole>(
+    searchParams.get('role') === 'Merchant' ? 'Merchant' : 'Customer'
+  );
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('role') === 'Merchant') {
+      setRole('Merchant');
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      await register(name, email, password, role);
-      navigate('/');
+      const regUser = await register(name, email, password, role);
+      if (regUser.role === 'Merchant') {
+        navigate('/merchant');
+      } else {
+        navigate('/');
+      }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Registration failed. Please try again.');
     } finally {

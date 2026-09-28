@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingBag, Lock, Mail, ArrowRight, ShieldCheck, Store, UserCheck } from 'lucide-react';
+import { ShoppingBag, Lock, Mail, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/client';
 
@@ -53,25 +53,16 @@ export const LoginPage: React.FC = () => {
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
-      navigate('/');
+      const loggedUser = await login(email, password);
+      if (loggedUser.role === 'Admin') {
+        navigate('/admin');
+      } else if (loggedUser.role === 'Merchant') {
+        navigate('/merchant');
+      } else {
+        navigate('/');
+      }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login failed. Please verify credentials.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const quickLogin = async (demoEmail: string, demoPass: string) => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
-    setError('');
-    setLoading(true);
-    try {
-      await login(demoEmail, demoPass);
-      navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Quick login failed.');
     } finally {
       setLoading(false);
     }
@@ -232,39 +223,6 @@ export const LoginPage: React.FC = () => {
               </div>
             </div>
           )}
-
-          {/* Quick Demo Logins */}
-          <div className="mt-8 pt-6 border-t border-slate-200">
-            <p className="text-center text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-3">
-              One-Click Demo Assessment Logins
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => quickLogin('customer@easyshop.com', 'Customer123!')}
-                className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 text-slate-700 hover:text-indigo-700 transition-all text-[11px]"
-              >
-                <UserCheck className="w-4 h-4 mb-1 text-indigo-500" />
-                <span className="font-semibold">Customer</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => quickLogin('merchant@easyshop.com', 'Merchant123!')}
-                className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 text-slate-700 hover:text-emerald-700 transition-all text-[11px]"
-              >
-                <Store className="w-4 h-4 mb-1 text-emerald-500" />
-                <span className="font-semibold">Merchant</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => quickLogin('admin@easyshop.com', 'Admin123!')}
-                className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-50 hover:bg-purple-50 border border-slate-200 hover:border-purple-200 text-slate-700 hover:text-purple-700 transition-all text-[11px]"
-              >
-                <ShieldCheck className="w-4 h-4 mb-1 text-purple-500" />
-                <span className="font-semibold">Admin</span>
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>
