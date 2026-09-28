@@ -1,9 +1,9 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CreditCard, Smartphone, Banknote, ShieldCheck, MapPin, CheckCircle } from 'lucide-react';
+import { CreditCard, Smartphone, Banknote, ShieldCheck, MapPin, CheckCircle, Tag, Sparkles, X } from 'lucide-react';
 import api from '../../api/client';
 import { useCart } from '../../context/CartContext';
-import { Address, Order } from '../../types';
+import { Address, Order, CouponResult } from '../../types';
 
 export const CheckoutPage: React.FC = () => {
   const { items, subtotal, clearCart } = useCart();
@@ -12,6 +12,12 @@ export const CheckoutPage: React.FC = () => {
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
   const [showNewAddress, setShowNewAddress] = useState(false);
+
+  // Coupon state
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<CouponResult | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState('');
 
   // New address form
   const [fullName, setFullName] = useState('');
@@ -53,6 +59,38 @@ export const CheckoutPage: React.FC = () => {
       setShowNewAddress(true);
     }
   };
+
+  const handleApplyCoupon = async (codeToApply?: string) => {
+    const code = (codeToApply || couponCode).trim();
+    if (!code) return;
+    setCouponLoading(true);
+    setCouponError('');
+    try {
+      const res = await api.post<CouponResult>('/coupons/validate', {
+        code,
+        subtotal,
+      });
+      if (res.data.isValid) {
+        setAppliedCoupon(res.data);
+        setCouponCode(res.data.code);
+        setCouponError('');
+      } else {
+        setCouponError(res.data.message || 'Invalid coupon.');
+      }
+    } catch (err: any) {
+      setCouponError(err.response?.data?.message || 'Error validating coupon.');
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode('');
+    setCouponError('');
+  };
+
+  const finalTotalAmount = appliedCoupon ? appliedCoupon.finalTotal : subtotal;
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -357,18 +395,91 @@ export const CheckoutPage: React.FC = () => {
               ))}
             </div>
 
+            <div className="pt-2 border-t border-slate-100">
+              <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Apply Promo Code</span>
+              </label>
+
+              {appliedCoupon ? (
+                <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs text-emerald-800">
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-emerald-600" />
+                    <div>
+                      <p className="font-bold">{appliedCoupon.code} Applied</p>
+                      <p className="text-[10px] text-emerald-700">You saved ₹{appliedCoupon.discountAmount.toLocaleString('en-IN')}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={removeCoupon}
+                    className="p-1 text-slate-400 hover:text-red-500 rounded-lg"
+                    title="Remove coupon"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                      placeholder="e.g. WELCOME20"
+                      className="flex-1 px-3 py-1.5 text-xs font-mono uppercase border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      disabled={couponLoading || !couponCode.trim()}
+                      onClick={() => handleApplyCoupon()}
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition"
+                    >
+                      {couponLoading ? '...' : 'Apply'}
+                    </button>
+                  </div>
+                  {couponError && (
+                    <p className="text-[11px] text-red-600">{couponError}</p>
+                  )}
+                  {/* Quick Coupon Chips */}
+                  <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                    <button
+                      type="button"
+                      onClick={() => { setCouponCode('WELCOME20'); handleApplyCoupon('WELCOME20'); }}
+                      className="px-2 py-0.5 rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-semibold border border-indigo-200 transition"
+                    >
+                      🏷️ WELCOME20 (20% Off)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setCouponCode('SAVE500'); handleApplyCoupon('SAVE500'); }}
+                      className="px-2 py-0.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-semibold border border-emerald-200 transition"
+                    >
+                      🏷️ SAVE500 (₹500 Off)
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="border-t border-slate-100 pt-3 space-y-2 text-xs text-slate-600">
               <div className="flex justify-between">
                 <span>Subtotal</span>
                 <span className="font-bold text-slate-800">₹{subtotal.toLocaleString('en-IN')}</span>
               </div>
+              {appliedCoupon && (
+                <div className="flex justify-between text-emerald-600 font-semibold">
+                  <span>Coupon Discount ({appliedCoupon.code})</span>
+                  <span>- ₹{appliedCoupon.discountAmount.toLocaleString('en-IN')}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span>Delivery</span>
                 <span className="font-bold text-emerald-600">FREE</span>
               </div>
               <div className="border-t border-slate-100 pt-2 flex justify-between text-sm font-black text-slate-900">
                 <span>Total Amount</span>
-                <span>₹{subtotal.toLocaleString('en-IN')}</span>
+                <span>₹{finalTotalAmount.toLocaleString('en-IN')}</span>
               </div>
             </div>
 
@@ -378,7 +489,7 @@ export const CheckoutPage: React.FC = () => {
               className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md shadow-emerald-200 disabled:opacity-50 transition-all"
             >
               <ShieldCheck className="w-4 h-4" />
-              <span>{loading ? 'Processing Transaction...' : `Confirm & Pay ₹${subtotal.toLocaleString('en-IN')}`}</span>
+              <span>{loading ? 'Processing Transaction...' : `Confirm & Pay ₹${finalTotalAmount.toLocaleString('en-IN')}`}</span>
             </button>
           </div>
         </div>

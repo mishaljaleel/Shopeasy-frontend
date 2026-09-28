@@ -6,6 +6,7 @@ import { WishlistProvider } from './context/WishlistContext';
 import { SignalRProvider } from './context/SignalRContext';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
+import { ChatbotWidget } from './components/ChatbotWidget';
 
 // Pages
 import { CatalogPage } from './pages/customer/CatalogPage';
@@ -112,6 +113,7 @@ export function App() {
                   </Routes>
                 </main>
                 <Footer />
+                <ChatbotWidget />
               </div>
             </SignalRProvider>
           </WishlistProvider>

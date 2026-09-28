@@ -176,3 +176,23 @@ export interface AdminUser {
   orderCount: number;
 }
 
+export interface Coupon {
+  code: string;
+  title: string;
+  description: string;
+  discountType: 'Percentage' | 'Fixed' | 'FreeShipping';
+  value: number;
+  minOrderAmount: number;
+  maxDiscount?: number;
+}
+
+export interface CouponResult {
+  isValid: boolean;
+  code: string;
+  discountType: string;
+  discountAmount: number;
+  finalTotal: number;
+  message: string;
+}
+
+

@@ -1,8 +1,9 @@
-﻿import React from 'react';
+import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Trash2, ArrowRight, ShoppingBag, ArrowLeft } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
+import { ProductRecommendations } from '../../components/ProductRecommendations';
 
 export const CartPage: React.FC = () => {
   const { items, updateQuantity, removeFromCart, subtotal, clearCart } = useCart();
@@ -147,6 +148,13 @@ export const CartPage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Smart Product Recommendations */}
+      <ProductRecommendations
+        title="Frequently Bought Together"
+        subtitle="Pair these trending essentials with items in your cart"
+        limit={4}
+      />
     </div>
   );
 };

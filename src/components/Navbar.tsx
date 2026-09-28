@@ -4,6 +4,7 @@ import { ShoppingBag, ShoppingCart, User, LogOut, LayoutDashboard, Shield, Packa
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
+import { VoiceSearchButton } from './VoiceSearchButton';
 
 export const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
@@ -19,6 +20,11 @@ export const Navbar: React.FC = () => {
     } else {
       navigate('/');
     }
+  };
+
+  const handleVoiceSearch = (transcript: string) => {
+    setSearch(transcript);
+    navigate(`/?search=${encodeURIComponent(transcript)}`);
   };
 
   return (
@@ -40,8 +46,11 @@ export const Navbar: React.FC = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search laptops, headphones, apparel..."
-            className="w-full pl-9 pr-4 py-2 bg-slate-100/80 border border-slate-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
+            className="w-full pl-9 pr-10 py-2 bg-slate-100/80 border border-slate-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
           />
+          <div className="absolute right-2 flex items-center">
+            <VoiceSearchButton onTranscript={handleVoiceSearch} />
+          </div>
         </form>
 
         {/* Navigation Links & User Menu */}

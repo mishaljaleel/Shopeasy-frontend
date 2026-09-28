@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Star, ShieldCheck, ArrowLeft, Truck, RefreshCw, ShoppingCart, CheckCircle2, MessageSquarePlus, Heart } from 'lucide-react';
+import { Star, ShieldCheck, ArrowLeft, Truck, RefreshCw, ShoppingCart, CheckCircle2, MessageSquarePlus, Heart, Compass, Image as ImageIcon } from 'lucide-react';
 import api from '../../api/client';
 import { Product, Review } from '../../types';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { useWishlist } from '../../context/WishlistContext';
+import { Product3DViewer } from '../../components/Product3DViewer';
+import { ProductRecommendations } from '../../components/ProductRecommendations';
 
 export const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -18,6 +20,7 @@ export const ProductDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
+  const [mediaMode, setMediaMode] = useState<'photo' | '3d'>('photo');
 
   // New review state
   const [newRating, setNewRating] = useState(5);
@@ -114,13 +117,49 @@ export const ProductDetailPage: React.FC = () => {
 
       {/* Main Details Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-14">
-        {/* Product Image */}
-        <div className="relative aspect-4/3 sm:aspect-square rounded-3xl overflow-hidden bg-slate-100 border border-slate-200 shadow-md">
-          <img
-            src={product.imageUrl || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800'}
-            alt={product.name}
-            className="w-full h-full object-cover object-center"
-          />
+        {/* Product Media Column with 3D Inspector */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Product Visualizer</span>
+            <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setMediaMode('photo')}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition ${
+                  mediaMode === 'photo'
+                    ? 'bg-white text-indigo-600 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <ImageIcon className="w-3.5 h-3.5" />
+                <span>Photos</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMediaMode('3d')}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition ${
+                  mediaMode === '3d'
+                    ? 'bg-white text-indigo-600 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Compass className="w-3.5 h-3.5" />
+                <span>3D 360° Inspector</span>
+              </button>
+            </div>
+          </div>
+
+          {mediaMode === 'photo' ? (
+            <div className="relative aspect-4/3 sm:aspect-square rounded-3xl overflow-hidden bg-slate-100 border border-slate-200 shadow-md">
+              <img
+                src={product.imageUrl || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800'}
+                alt={product.name}
+                className="w-full h-full object-cover object-center"
+              />
+            </div>
+          ) : (
+            <Product3DViewer product={product} />
+          )}
         </div>
 
         {/* Product Metadata & Actions */}
@@ -369,6 +408,12 @@ export const ProductDetailPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Smart AI Product Recommendations */}
+      <ProductRecommendations
+        currentProductId={product.productID}
+        categoryName={product.categoryName}
+      />
     </div>
   );
 };
