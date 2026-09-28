@@ -24,9 +24,10 @@ export const ProductRecommendations: React.FC<ProductRecommendationsProps> = ({
 
   useEffect(() => {
     setLoading(true);
-    api.get<Product[]>('/products')
+    api.get<any>('/products', { params: { pageSize: 50 } })
       .then((res) => {
-        let items = res.data || [];
+        const raw = res.data;
+        let items: Product[] = Array.isArray(raw) ? raw : (raw?.items || []);
 
         // Exclude current product if viewing one
         if (currentProductId) {

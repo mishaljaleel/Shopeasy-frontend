@@ -32,8 +32,11 @@ export const ChatbotWidget: React.FC = () => {
 
   // Load catalog once for instant in-chat recommendations
   useEffect(() => {
-    api.get<Product[]>('/products')
-      .then((res) => setCatalog(res.data || []))
+    api.get<any>('/products', { params: { pageSize: 50 } })
+      .then((res) => {
+        const items = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+        setCatalog(items);
+      })
       .catch(() => {});
   }, []);
 
@@ -65,10 +68,25 @@ export const ChatbotWidget: React.FC = () => {
     setIsTyping(true);
 
     setTimeout(() => {
-      const botResponse = generateBotResponse(text);
-      setMessages((prev) => [...prev, botResponse]);
-      setIsTyping(false);
-    }, 600);
+      try {
+        const botResponse = generateBotResponse(text);
+        setMessages((prev) => [...prev, botResponse]);
+      } catch (err) {
+        console.error('Error generating bot response:', err);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            sender: 'bot',
+            text: "I'm having a momentary hiccup searching the catalog, but our store is fully open! Feel free to browse products or check your orders.",
+            actionLink: { text: 'Explore All Products', url: '/products' },
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          },
+        ]);
+      } finally {
+        setIsTyping(false);
+      }
+    }, 500);
   };
 
   const generateBotResponse = (query: string): Message => {
@@ -112,21 +130,57 @@ export const ChatbotWidget: React.FC = () => {
     }
 
     // 4. Product Search / Recommendation
-    const matchedProducts = catalog.filter((p) => {
-      const qTerms = lower.split(' ').filter((w) => w.length > 2);
-      return qTerms.some((term) =>
-        p.name.toLowerCase().includes(term) ||
-        p.description?.toLowerCase().includes(term) ||
-        p.categoryName?.toLowerCase().includes(term)
-      );
+    const safeCatalog = Array.isArray(catalog) ? catalog : [];
+    const isLaptopQuery = lower.includes('laptop') || lower.includes('computer') || lower.includes('macbook') || lower.includes('work');
+    const isHeadphoneQuery = lower.includes('headphone') || lower.includes('audio') || lower.includes('earphone') || lower.includes('sound') || lower.includes('music');
+    const isKeyboardQuery = lower.includes('keyboard') || lower.includes('gaming');
+    const isClothesQuery = lower.includes('hoodie') || lower.includes('cloth') || lower.includes('wear') || lower.includes('fashion');
+
+    const matchedProducts = safeCatalog.filter((p) => {
+      const pName = (p.name || '').toLowerCase();
+      const pDesc = (p.description || '').toLowerCase();
+      const pCat = (p.categoryName || '').toLowerCase();
+      const combined = `${pName} ${pDesc} ${pCat}`;
+
+      if (isLaptopQuery && (pCat.includes('laptop') || combined.includes('ultrabook') || combined.includes('laptop') || combined.includes('computer'))) {
+        return true;
+      }
+      if (isHeadphoneQuery && (pCat.includes('audio') || combined.includes('headphone') || combined.includes('audio'))) {
+        return true;
+      }
+      if (isKeyboardQuery && (combined.includes('keyboard') || combined.includes('gaming'))) {
+        return true;
+      }
+      if (isClothesQuery && (combined.includes('hoodie') || combined.includes('cotton') || combined.includes('fashion'))) {
+        return true;
+      }
+
+      // Token match with basic stemming (stripping 's')
+      const qTerms = lower.replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter((w) => w.length > 2);
+      return qTerms.some((term) => {
+        const stem = term.endsWith('s') ? term.slice(0, -1) : term;
+        return combined.includes(term) || (stem.length > 2 && combined.includes(stem));
+      });
     });
 
     if (matchedProducts.length > 0) {
       return {
         id: (Date.now() + 1).toString(),
         sender: 'bot',
-        text: `I found ${matchedProducts.length} great match${matchedProducts.length > 1 ? 'es' : ''} in our catalog for you:`,
+        text: `I found ${matchedProducts.length} top match${matchedProducts.length > 1 ? 'es' : ''} for "${query}" in our catalog:`,
         products: matchedProducts.slice(0, 3),
+        timestamp: time,
+      };
+    }
+
+    // Fallback recommendations if catalog exists
+    if (safeCatalog.length > 0) {
+      return {
+        id: (Date.now() + 1).toString(),
+        sender: 'bot',
+        text: `I couldn't find an exact match for "${query}", but here are some of our trending picks from the store:`,
+        products: safeCatalog.slice(0, 2),
+        actionLink: { text: 'Browse Full Store Catalog', url: '/products' },
         timestamp: time,
       };
     }
